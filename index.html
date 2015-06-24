@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <style type="text/css">
+      html, body, #map-canvas { height: 100%; margin: 0; padding: 0;}
+    </style>
+    <script type="text/javascript"
+      src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCGpwpuw7Pi3wfrGRmj51sEJ0Lsyo5rL6Q">
+    </script>
+    <script src="bower_components/jquery/dist/jquery.js"></script>
+    <script type="text/javascript">
+      ///////////////////// STYLE STYLE STYLE STYLE STYLE STYLE STYLE ///////////////////////////////////////
+      var mapStyle = [
+      {
+        "featureType": "road",
+        "elementType": "labes",
+        "stylers": [
+          { "visibility": "off" }
+        ]
+      },{
+        "featureType": "road",
+        "elementType": "geometry",
+        "stylers": [
+          { "visibility": "off" }
+        ]
+      },{
+        "featureType": "administrative.country",
+        "elementType": "labels",
+        "stylers": [
+          { "visibility": "off" }
+        ]
+      },{
+        "featureType": "administrative.province",
+        "elementType": "geometry.stroke",
+        "stylers": [
+          { "visibility": "on" },
+          { "lightness": -43 },
+          { "saturation": -26 }
+        ]
+      },{
+        "featureType": "transit",
+        "stylers": [
+          { "hue": "#00ff09" },
+          { "color": "#666" },
+          { "visibility": "off" }
+        ]
+      },{
+        "featureType": "administrative.neighborhood",
+        "elementType": "labels",
+        "stylers": [
+          { "visibility": "off" }
+        ]
+      }
+    ];
+
+//////////////////////// DATA DATA DATA DATA DATA DATA DATA DATA DATA DATA DATA ////////////////////////
+    // Get the Data
+    function getThatJSon() {
+      var request = new XMLHttpRequest();
+
+      request.open("GET", "https://visualmetalarchives.firebaseio.com/.json", false);
+
+      request.send();
+
+      // Converts invalid json to for realsies json
+      var results = JSON.stringify(eval("(" + request.responseText + ")"));
+      var json = JSON.parse(results);
+
+      // Get that J, son
+      return json;
+    }
+
+/////////////////////////////// MAP MAP MAP MAP MAP MAP MAP MAP ///////////////////////////////////
+    function initialize() {
+      // Create the map.
+      var mapOptions = {
+        zoom: 8,
+        center: new google.maps.LatLng(52.0841867, 5.0824915),
+        mapTypeId: google.maps.MapTypeId.TERRAIN,
+        styles: mapStyle
+      };
+
+      var map = new google.maps.Map(document.getElementById('map-canvas'),
+          mapOptions);
+
+ ///////////////////////////// BANDS  BANDS BANDS BANDS BANDS BANDS ///////////////////////////////
+      var bandmap = {};
+      var bands;
+      
+      var distance = 50;
+
+      bands = getThatJSon();
+      
+      // For every band in the database
+      for(var e in bands) {
+
+        var city = bands[e].location;
+
+        if(city != undefined) {
+          // check if there is a key in bandmap by city
+          // if not, make one
+          if(bandmap[city] === undefined) {
+            bandmap[city] = [];
+          }
+
+          // Check if there are already locations in the bandmap
+          // Adjust lat and or lng if so
+          if(bandmap[city] !== undefined && bandmap[city].length > 0) {
+
+            var predecessor = 0;
+
+            if(bandmap[city].length > 7) {
+              var list = bandmap[city];
+              predecessor = list[(bandmap[city].length) - 8].center;
+            }
+            
+            var direction = bandmap[city].length % 8;
+            // var radius = Math.sqrt(bands[e].albums);
+            var offset = 0.007 * (Math.ceil(bandmap[city].length / 8));
+
+            //rotate n/ne/e/se/s/sw/w/nw aka lat-lng +0/++/0+/-+/-0/--/0-/+- aka 0/1/2/3/4/5/6/7
+            if(direction == 0 || direction == 1 || direction == 7) {bands[e].lat += offset;}
+            if(direction == 1 || direction == 2 || direction == 3) {bands[e].lng += offset;}
+            if(direction == 3 || direction == 4 || direction == 5) {bands[e].lat -= offset;}
+            if(direction == 5 || direction == 6 || direction == 7) {bands[e].lng -= offset;}
+          }
+
+          // make a key within the city key by the name of the band
+          // containing the number of albums, longitude, latitude and genre
+          bandmap[city].push({
+            name:     bands[e].name,
+            center:   new google.maps.LatLng(bands[e].lat, bands[e].lng),
+            albums:   bands[e].numberOfAlbums,
+            genre:    bands[e].genre,
+            status:   bands[e].status
+          });
+        }
+      }
+      console.log(bandmap)
+
+///////////////////////////// CIRCLES CIRCLES CIRCLES CIRCLES CIRCLES CIRCLES ////////////////////
+      // Make circlessss
+      
+      var cityCircle;
+
+      for (var location in bandmap) {
+        var city = bandmap[location];
+        for (var band in city) {
+          var populationOptions = {
+            strokeColor: '#FF0000',
+            strokeOpacity: 0.8,
+            strokeWeight: 2,
+            fillColor: '#FF0000',
+            fillOpacity: 0.35,
+            map: map,
+            center: city[band].center,
+            radius: Math.sqrt(city[band].albums) * (distance * 4)
+          };
+
+          // change the color of the circle by status
+          // Green
+          if(city[band].status == "Active") { 
+            populationOptions.strokeColor = '#00FF00'; 
+            populationOptions.fillColor   = '#00FF00'; 
+          }
+          // Red
+          else if(city[band].status == "Split-up") {
+            populationOptions.strokeColor = '#FF0000'; 
+            populationOptions.fillColor   = '#FF0000';
+          }
+          // Blue
+          else if(city[band].status == "Changed name") {
+            populationOptions.strokeColor = '#0000FF'; 
+            populationOptions.fillColor   = '#0000FF';
+          }
+          // Yellow
+          else if(city[band].status == "On hold") {
+            populationOptions.strokeColor = '#FFFF00'; 
+            populationOptions.fillColor   = '#FFFF00';
+          }
+
+          // Add the circle for this city to the map.
+          cityCircle = new google.maps.Circle(populationOptions);
+        }
+      }
+    }
+
+    google.maps.event.addDomListener(window, 'load', initialize);
+    </script>
+  </head>
+  <body>
+<div id="map-canvas"></div>
+  </body>
+</html>
